@@ -1,0 +1,131 @@
+version: "3"
+
+networks:
+  dcs-bank:
+    driver: bridge
+
+volumes:
+  loans-application-db:
+  volume1:
+
+
+services:
+  loans-application-service:
+    container_name: loans-app-host
+    build: 
+        context: ./Loans.Application
+        dockerfile: ./Dockerfile    
+    image: loans-application
+    ports:
+      - "2023:80"
+    networks:
+      - dcs-bank
+    volumes:
+      - ./loans-application/appsettings.json:/src/appsettings.json
+      - ./loans-application/logs:/src/logs
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      KafkaOptions__Servers__0: kafka1:9092
+    depends_on:
+      loans-application-service-db:
+        condition: service_healthy
+      loans-application-service-migration:
+        condition: service_completed_successfully
+      decision-maker-service:
+        condition: service_started
+
+  loans-application-service-db:
+    image: postgres:latest
+    restart: unless-stopped
+    container_name: loans-app-db
+    ports:
+      - "6432:5432"
+    environment:
+      POSTGRES_DB: "loans-application"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
+      PGUSER: "postgres"
+      PGDATA: /data/postgres
+    healthcheck:
+      test: /usr/bin/pg_isready
+      interval: 5s
+      timeout: 10s
+      retries: 120  
+    volumes:
+      - loans-application-db:/data/loans-application-db
+    networks:
+      - dcs-bank
+
+  decision-maker-service:
+    image: nickholas/dcs-decision-maker-service:latest
+    container_name: dms
+    environment:
+      - KafkaConfigurations__Servers=kafka1:9092
+    ports:
+      - "2001:80"
+    depends_on:
+      - decision-maker-service-db
+      - kafka1
+    networks:
+      - dcs-bank
+    volumes:
+      - ./decision-maker-service/appsettings.json:/app/appsettings.json
+    restart: always
+
+  decision-maker-service-db:
+    image: postgres:latest
+    container_name: dms-db
+    ports:
+    - 5433:5432
+    environment:
+      POSTGRES_DB: "product_catalog"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "111111"
+    networks:
+     - dcs-bank
+
+  loans-application-service-migration:
+      build: 
+        context: ./Loans.Application/Loans.Application.Migrations
+        dockerfile: Dockerfile
+      image: dcs-loans-application-migration
+      container_name: loans-app-migration
+      depends_on:
+        loans-application-service-db:
+          condition: service_healthy 
+      volumes:
+        - ./loans-application-service-migration/appsettings.json:/app/appsettings.json
+      networks:
+        - dcs-bank
+  
+  kafka1:
+    image: 'bitnami/kafka:latest'
+    container_name: kafka1
+    ports:
+      - "9094:9094"
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka1:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_BROKER_ID=1
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka1:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_NODE_ID=1
+    volumes:
+      - volume1:/bitnami/kafka
+    networks:
+      - dcs-bank
+
+  ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8081:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka1:9092
+      - KAFKA_CLUSTERS_0_NAME=kraft
+    networks:
+      - dcs-bank
