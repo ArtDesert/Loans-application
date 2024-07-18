@@ -12,11 +12,11 @@
 ### 8. ApiGatewayService - внешний API-сервис для клиентов, который проксирует вызовы на методы сервиса LoansApplicationHost (в разработке)
 ### 9. EmailingService - сервис для асинхронного оповещения клиентов по электронной почте о принятом решении по кредитной заявке (в разработке)
 
-![alt text](src/images/image0.png)
+![alt text](Loans.Application/src/images/image0.png)
 
 ### 1. Метод clients/create добавляет нового клиента. Добавим 3-х клиентов и проверим бд:
-![alt text](src/images/image-1.png)
-![alt text](src/images/image.png)
+![alt text](Loans.Application/src/images/image-1.png)
+![alt text](Loans.Application/src/images/image.png)
 ### 2. Метод clients/filter возвращает клиентов по фильтру: фамилия, имя, отчество, нижняя и верхняя границы даты рождения и зарплаты. На  запросе
 ```json
 {
@@ -24,13 +24,13 @@
 }
 ```
 ### получим двух клиентов, отчества которых начинаются на букву "В":
-![alt text](src/images/image-3.png)
+![alt text](Loans.Application/src/images/image-3.png)
 ### На пустом запросе вернутся все имеющиеся клиенты:
 ```json
 {
 }
 ```
-![alt text](src/images/image-4.png)
+![alt text](Loans.Application/src/images/image-4.png)
 ### 3. Для проверки метода создания кредитной заявки локально, должны быть развёрнуты сервис принятий решений, его база данных и сервер Kafka в Docker.
 ### Вызовем три раза метод /loans/create c запросом:
 ```json
@@ -41,13 +41,13 @@
 }
 ```
 ### В KafkaUi у нас есть два топика calculate-decision-event, который содержит запросы на принятие решение по заявке, и calculate-decision-event-result, который содержит ответы на эти запросы. При вызове метода /loans/create создаётся запись в бд с пустыми полями и отправляется сообщение в топик calculate-decision-event. Далее сервис принятия решений получает это сообщение, выполняет свою логику и отправляет результат в топик calculate-decision-event-result. После чего loans-application-host получает это сообщение из топика calculate-decision-event-result и обновляет запись бд с соответствующим id полями из этого сообщения.
-![alt text](src/images/image-8.png)
+![alt text](Loans.Application/src/images/image-8.png)
 ### В топике calculate-decision-event есть три сообщения:
-![alt text](src/images/image-9.png)
+![alt text](Loans.Application/src/images/image-9.png)
 ### Аналогично в топике calculate-decision-event-result находится три ответа на эти сообщения:
-![alt text](src/images/image-10.png)
+![alt text](Loans.Application/src/images/image-10.png)
 ### Проверим в локально развёрнутой бд наличие заявок:
-![alt text](src/images/image-11.png)
+![alt text](Loans.Application/src/images/image-11.png)
 ## 4. /loans/{loanId}/status - получение статуса заявки по её идентификатору
 ## 5. /loans/{clientId}/loans - получение всех заявок клиента по его идентификатору
 ## 6. /loans/{id} - получение заявки по её идентификатору
@@ -75,7 +75,7 @@
 docker-compose up --build -d
 ```
 ### Эта команда собирает образы всех сервисов описанных в файле docker-compose.yml и запускает их в фоновом режиме.
-![alt text](src/images/image-5.png)
+![alt text](Loans.Application/src/images/image-5.png)
 ### 2. Добавить строку подключения для loans-application-service-migration и loans-application.
-![alt text](src/images/image-6.png)
+![alt text](Loans.Application/src/images/image-6.png)
 ### 3. Открыть web-host по адресу http://localhost:2023/swagger/index.html
